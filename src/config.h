@@ -45,3 +45,13 @@ struct Config {
 
 /// %APPDATA%\quietkey\config.ini
 std::wstring ConfigPath();
+
+// ---- 开机自启 ----
+//
+// 真相存在注册表（HKCU\...\Run）而不是配置文件里：用户可能用任务管理器的
+// 「启动」页、或者别的工具改掉它，配置文件跟着走只会两边打架。
+// 界面上的勾选框每次打开都从注册表现读。
+
+bool IsAutoStartEnabled();
+/// 返回是否成功。失败的原因通常是注册表被安全软件锁了，要如实告诉用户。
+bool SetAutoStart(bool enabled);

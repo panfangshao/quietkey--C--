@@ -65,17 +65,36 @@ void ApplyHotkeyFromConfig(bool notifyOnFailure) {
     }
 }
 
+/// 托盘悬停提示：把「热键 + 已触发次数」摆出来，悬停一下就知道它还活着。
+void RefreshTrayTooltip() {
+    std::wstring tip = L"quietkey";
+    if (g_app.hotkey.active()) {
+        tip += L" — " + FormatHotkey(g_app.hotkey.current());
+    } else {
+        tip += L" — 热键未注册";
+    }
+    tip += L" — 已触发 " + std::to_wstring(g_app.triggerCount) + L" 次";
+    g_app.tray.SetTooltip(tip.c_str());
+}
+
 /// 执行一次播放/暂停，并把结果送到界面和日志。
 void TriggerToggle() {
     const ActionReport report = TogglePlayPause(g_app.cfg);
     ++g_app.triggerCount;
     LogF(L"热键触发: %s", report.Summary().c_str());
     SettingsRefreshLastReport(report);
+    RefreshTrayTooltip();
 
     // 成功时保持安静（这个工具的全部意义就是不打扰你）；
     // 只有真的没生效才弹气泡，否则用户会以为程序坏了却没有任何线索。
     if (!report.ok) {
-        g_app.tray.Balloon(L"quietkey 没能生效", report.detail.c_str());
+        // 气泡里放一句能直接照做的话，完整解释留给设置界面的「上次触发」。
+        // 别把长段落塞进气泡——读不完，也盖不住重点。
+        const wchar_t* hint =
+            report.detail.find(L"没有注册媒体会话") != std::wstring::npos
+                ? L"没检测到正在播放的媒体。到播放页面按 F5 重新播放通常就好了。"
+                : L"打开设置 →「上次触发」可以看到每一层的尝试结果。";
+        g_app.tray.Balloon(L"quietkey 这次没生效", hint);
     }
 }
 
@@ -83,6 +102,7 @@ void OpenSettings() {
     ShowSettingsDialog(g_app.instance, g_app.hwnd, &g_app.cfg, [](const Config& cfg) {
         // 「保存并应用」：先重挂热键，再落盘。
         ApplyHotkeyFromConfig(true);
+        RefreshTrayTooltip();
         if (!cfg.Save()) {
             MessageBoxW(nullptr, L"配置写入失败，改动只在本次运行有效。", kAppName,
                         MB_OK | MB_ICONWARNING);
@@ -282,6 +302,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     }
 
     ApplyHotkeyFromConfig(true);
+    RefreshTrayTooltip();
 
     // 第一次运行（还没有配置文件）就把设置界面摆出来，
     // 否则用户只看到一个托盘图标，不知道该干什么。

@@ -85,6 +85,68 @@ std::wstring ConfigPath() {
     return dir + L"\\config.ini";
 }
 
+namespace {
+
+constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr wchar_t kRunValue[] = L"quietkey";
+
+/// 本 exe 的完整路径，带引号——路径里有空格时不加引号会被拆成两段。
+std::wstring QuotedExePath() {
+    wchar_t path[MAX_PATH] = {};
+    if (GetModuleFileNameW(nullptr, path, _countof(path)) == 0) {
+        return std::wstring();
+    }
+    return L"\"" + std::wstring(path) + L"\"";
+}
+
+}  // namespace
+
+bool IsAutoStartEnabled() {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) {
+        return false;
+    }
+    wchar_t buf[MAX_PATH * 2] = {};
+    DWORD size = sizeof(buf);
+    DWORD type = 0;
+    const LSTATUS r = RegQueryValueExW(key, kRunValue, nullptr, &type,
+                                       reinterpret_cast<LPBYTE>(buf), &size);
+    RegCloseKey(key);
+    if (r != ERROR_SUCCESS || type != REG_SZ) {
+        return false;
+    }
+    // 只认"指向当前这个 exe"的项。程序被挪过位置的话，旧的自启项已经失效，
+    // 界面显示未启用才是诚实的——用户重新勾一次就会写成新路径。
+    return _wcsicmp(buf, QuotedExePath().c_str()) == 0;
+}
+
+bool SetAutoStart(bool enabled) {
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, kRunKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr,
+                        &key, nullptr) != ERROR_SUCCESS) {
+        LogF(L"打开注册表启动项失败（错误码 %lu）", GetLastError());
+        return false;
+    }
+    LSTATUS r;
+    if (enabled) {
+        const std::wstring value = QuotedExePath();
+        r = RegSetValueExW(key, kRunValue, 0, REG_SZ,
+                           reinterpret_cast<const BYTE*>(value.c_str()),
+                           static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
+    } else {
+        r = RegDeleteValueW(key, kRunValue);
+        if (r == ERROR_FILE_NOT_FOUND) {
+            r = ERROR_SUCCESS;  // 本来就没有，等于已经是关闭状态
+        }
+    }
+    RegCloseKey(key);
+    if (r != ERROR_SUCCESS) {
+        LogF(L"写入注册表启动项失败（错误码 %ld）", r);
+        return false;
+    }
+    return true;
+}
+
 Config Config::Load() {
     Config cfg;
     const std::wstring path = ConfigPath();

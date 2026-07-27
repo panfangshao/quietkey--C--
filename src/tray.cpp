@@ -80,6 +80,16 @@ void Tray::ShowContextMenu(HWND hwnd, POINT pt) {
     DestroyMenu(menu);
 }
 
+void Tray::SetTooltip(const wchar_t* tooltip) {
+    if (!added_) {
+        return;
+    }
+    wcsncpy_s(data_.szTip, tooltip, _TRUNCATE);
+    NOTIFYICONDATAW n = data_;
+    n.uFlags = NIF_TIP | NIF_SHOWTIP;
+    Shell_NotifyIconW(NIM_MODIFY, &n);
+}
+
 void Tray::Balloon(const wchar_t* title, const wchar_t* text) {
     if (!added_) {
         return;

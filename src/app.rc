@@ -66,6 +66,9 @@ BEGIN
     LISTBOX         IDC_SESSIONS, 166, 310, 204, 26,
                     LBS_NOSEL | WS_VSCROLL | WS_BORDER | NOT WS_TABSTOP
 
+    CONTROL         "开机时自动启动", IDC_AUTOSTART, "Button",
+                    BS_AUTOCHECKBOX | WS_TABSTOP, 14, 349, 92, 10
+    LTEXT           "关窗口只缩到托盘，退出走托盘菜单", -1, 110, 349, 120, 10
     DEFPUSHBUTTON   "保存并应用", IDOK, 236, 346, 68, 14
     PUSHBUTTON      "缩到托盘", IDC_HIDE, 309, 346, 68, 14
 END

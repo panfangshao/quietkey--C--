@@ -30,6 +30,7 @@
 #define IDC_REFRESH_SESSIONS  1017
 #define IDC_SESSIONS          1018
 #define IDC_HIDE              1019
+#define IDC_AUTOSTART         1020
 
 // ---- 窗口拾取器对话框 ----
 #define IDD_PICKER            201

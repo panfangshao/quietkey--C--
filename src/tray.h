@@ -28,6 +28,10 @@ public:
     /// 气泡通知。用于把"热键触发了什么"这类结果告诉用户。
     void Balloon(const wchar_t* title, const wchar_t* text);
 
+    /// 更新鼠标悬停提示。程序常年只有一个图标，把「当前热键 + 触发次数」
+    /// 放进提示里，用户悬停一下就知道它还活着、热键是哪个。
+    void SetTooltip(const wchar_t* tooltip);
+
     /// 系统广播的 "TaskbarCreated" 消息号，主窗口过程要拿它做比较。
     static UINT TaskbarCreatedMessage();
 

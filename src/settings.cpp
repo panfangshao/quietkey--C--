@@ -175,6 +175,22 @@ void LoadIntoControls(HWND dlg) {
     Check(dlg, IDC_S_POSTMESSAGE, g_cfg->strategies.postmessage);
     Check(dlg, IDC_S_FALLBACK, g_cfg->strategies.focusSendInput);
     SetText(dlg, IDC_SETTLE, std::to_wstring(g_cfg->focusSettleMs));
+    // 自启状态的真相在注册表，每次打开界面都现读，不缓存也不写进配置文件。
+    Check(dlg, IDC_AUTOSTART, IsAutoStartEnabled());
+}
+
+/// 开机自启是立即生效的系统设置，不跟着「保存并应用」走，
+/// 点一下就写注册表——否则用户勾了不保存就走，行为会和看到的不一致。
+void OnAutoStartToggled(HWND dlg) {
+    const bool want = IsChecked(dlg, IDC_AUTOSTART);
+    if (SetAutoStart(want)) {
+        return;
+    }
+    MessageBoxW(dlg,
+                L"写入开机启动项失败。\n\n"
+                L"通常是被安全软件拦了，可以到「任务管理器 → 启动应用」里手动添加。",
+                L"quietkey", MB_OK | MB_ICONWARNING);
+    Check(dlg, IDC_AUTOSTART, IsAutoStartEnabled());  // 状态回退到真实情况
 }
 
 /// 把界面上的内容收进一份草稿。返回 false 表示有非法输入（已提示用户）。
@@ -310,6 +326,7 @@ INT_PTR CALLBACK SettingsProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM) {
                     return TRUE;
                 case IDC_TEST_ONCE:     DoTestOnce(dlg); return TRUE;
                 case IDC_REFRESH_SESSIONS: ShowSessions(dlg); return TRUE;
+                case IDC_AUTOSTART:     OnAutoStartToggled(dlg); return TRUE;
                 default: break;
             }
             break;
