@@ -1,0 +1,120 @@
+#include <windows.h>
+#include "resource.h"
+
+// 源文件里有中文，必须声明 UTF-8，否则版本信息会变乱码。
+#pragma code_page(65001)
+
+// 图标。文件由构建期的 make_icon 生成到 build 目录，
+// rc.exe 通过 CMakeLists.txt 里配置的 /I 找到它。
+IDI_APP ICON "quietkey.ico"
+
+// 应用程序清单：视觉样式 + PerMonitorV2 + asInvoker。
+1 RT_MANIFEST "app.manifest"
+
+// ---------------------------------------------------------------------------
+// 设置对话框。
+//
+// 用原生对话框资源而不是自绘：按钮、复选框、编辑框都是**真正的系统控件**，
+// 配合 manifest 里的 comctl32 v6，外观就是当前系统的样子，不是模仿。
+// 字体写 "Microsoft YaHei UI" 9pt——Win7 之后中文界面的标准字体。
+//
+// 坐标单位是对话框单位（DLU），不是像素，所以换 DPI / 换字号会自动缩放。
+// ---------------------------------------------------------------------------
+IDD_SETTINGS DIALOGEX 0, 0, 384, 366
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "quietkey 设置"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x86
+BEGIN
+    LTEXT           "", IDC_STATUS, 7, 7, 370, 18
+
+    GROUPBOX        "全局热键", -1, 7, 28, 370, 40
+    // 类名直接写字符串：HOTKEY_CLASS 那个宏在 commctrl.h 里，.rc 只包了 windows.h。
+    CONTROL         "", IDC_HOTKEY, "msctls_hotkey32", WS_TABSTOP, 14, 41, 110, 14
+    LTEXT           "点进去直接按组合键。走系统 RegisterHotKey：空闲零 CPU，按键会被系统独占，不会漏给正在打字的窗口。",
+                    IDC_HOTKEY_HINT, 132, 40, 240, 20
+
+    GROUPBOX        "目标窗口（第 2/3/4 层用；第 1 层不需要）", -1, 7, 72, 370, 48
+    LTEXT           "", IDC_TARGET_TEXT, 14, 85, 356, 10
+    PUSHBUTTON      "从窗口列表选择…", IDC_TARGET_PICK, 14, 99, 88, 14
+    PUSHBUTTON      "清空", IDC_TARGET_CLEAR, 108, 99, 44, 14
+    LTEXT           "存的是匹配规则而不是窗口句柄，目标程序重启后依然有效。",
+                    -1, 160, 102, 212, 10
+
+    GROUPBOX        "策略链（按打扰程度从小到大，第一个成功的即生效）", -1, 7, 124, 370, 92
+    CONTROL         "1 · Windows 媒体会话（GSMTC）—— 浏览器网页视频主力，完全无感",
+                    IDC_S_GSMTC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 137, 356, 10
+    CONTROL         "跟随最近播放/暂停过的那个视频（多个视频同时开着时才有区别）",
+                    IDC_S_FOLLOW, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 26, 151, 344, 10
+    CONTROL         "2 · WM_APPCOMMAND 定向投递 —— VLC / PotPlayer 等，完全无感",
+                    IDC_S_APPCOMMAND, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 165, 356, 10
+    CONTROL         "3 · PostMessage 键盘消息 —— 原生播放器有效，对网页视频无效",
+                    IDC_S_POSTMESSAGE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 179, 356, 10
+    CONTROL         "4 · 抢焦点 + SendInput（兜底，屏幕会闪一下）",
+                    IDC_S_FALLBACK, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 193, 210, 10
+    RTEXT           "焦点等待", IDC_SETTLE_LABEL, 228, 193, 44, 10
+    EDITTEXT        IDC_SETTLE, 276, 191, 30, 13, ES_NUMBER | ES_RIGHT
+    LTEXT           "ms", -1, 310, 193, 20, 10
+
+    GROUPBOX        "上次触发", -1, 7, 220, 370, 74
+    LTEXT           "", IDC_LAST_SUMMARY, 14, 233, 356, 10
+    EDITTEXT        IDC_TRACE, 14, 246, 356, 42,
+                    ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | NOT WS_TABSTOP
+
+    GROUPBOX        "诊断", -1, 7, 298, 370, 44
+    PUSHBUTTON      "立即测试一次", IDC_TEST_ONCE, 14, 310, 70, 14
+    PUSHBUTTON      "刷新媒体会话", IDC_REFRESH_SESSIONS, 90, 310, 70, 14
+    LISTBOX         IDC_SESSIONS, 166, 310, 204, 26,
+                    LBS_NOSEL | WS_VSCROLL | WS_BORDER | NOT WS_TABSTOP
+
+    DEFPUSHBUTTON   "保存并应用", IDOK, 236, 346, 68, 14
+    PUSHBUTTON      "缩到托盘", IDC_HIDE, 309, 346, 68, 14
+END
+
+// ---------------------------------------------------------------------------
+// 窗口拾取器。
+// 故意**不勾**「同时记住标题」：视频标题会随播放进度变，拿它做匹配很脆。
+// ---------------------------------------------------------------------------
+IDD_PICKER DIALOGEX 0, 0, 340, 232
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "选择目标窗口"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x86
+BEGIN
+    LTEXT           "筛选", -1, 7, 10, 20, 10
+    EDITTEXT        IDC_PICKER_FILTER, 30, 7, 200, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "刷新", IDC_PICKER_REFRESH, 236, 7, 44, 14
+    CONTROL         "同时记住当前标题（标题会变，一般不勾）", IDC_PICKER_MATCH_TITLE,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 26, 220, 10
+    LISTBOX         IDC_PICKER_LIST, 7, 40, 326, 160,
+                    LBS_NOTIFY | LBS_USETABSTOPS | WS_VSCROLL | WS_HSCROLL | WS_BORDER | WS_TABSTOP
+    LTEXT           "双击一行即可选中。", IDC_PICKER_HINT, 7, 206, 180, 10
+    DEFPUSHBUTTON   "确定", IDOK, 226, 211, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 283, 211, 50, 14
+END
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1, 0, 0, 0
+PRODUCTVERSION 1, 0, 0, 0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404B0"   // 简体中文 + Unicode
+        BEGIN
+            VALUE "CompanyName",      "quietkey"
+            VALUE "FileDescription",  "后台播放/暂停：一个热键，不切窗口、不抢焦点"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "quietkey"
+            VALUE "OriginalFilename", "quietkey.exe"
+            VALUE "ProductName",      "quietkey"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END

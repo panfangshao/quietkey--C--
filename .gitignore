@@ -1,0 +1,9 @@
+/build
+*.user
+*.aps
+*.pdb
+*.ilk
+
+# 排查时用 --console 重定向出来的运行日志
+quietkey.log
+quietkey.err.log
