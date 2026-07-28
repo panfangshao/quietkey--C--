@@ -62,3 +62,6 @@ set_target_properties(quietkey PROPERTIES LINK_FLAGS "/MANIFEST:NO")
 
 # WindowsApp.lib 是 C++/WinRT（媒体会话那一层）要的。
 target_link_libraries(quietkey PRIVATE comctl32 shlwapi dwmapi windowsapp)
+
+#CMake版编译会把C++运行时甩给了系统DLL，加上这条禁止这么做，但是体积稍微大100多KB
+set_property(TARGET quietkey PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
